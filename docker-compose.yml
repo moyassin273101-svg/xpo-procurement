@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: procurement
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app_dev_password}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d procurement"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD:-app_dev_password}@db:5432/procurement
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please-32chars}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-sonnet-5-5}
+      SEED_ON_START: ${SEED_ON_START:-true}
+      SEED_PASSWORD: ${SEED_PASSWORD:-Passw0rd!}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      PORT: 3000
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["3000:3000"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      retries: 20
+
+  web:
+    build: ./web
+    depends_on: [api]
+    ports: ["8080:80"]
+
+volumes:
+  pgdata:
